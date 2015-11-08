@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Migrates files older than specified date from source to dest
+Migrates files older than specified date from source to destination.
+
 """
 import argparse
 import os
@@ -29,14 +30,19 @@ LOG_FILENAME = './archive.log'
 logging.basicConfig(filename=LOG_FILENAME, level=logging.DEBUG)
 
 
-# handles copying the file
+# Thread worker. Handles copying the file
 def fileHandler(thread_id, args, q):
     global shouldIKeepGoing
     while shouldIKeepGoing:
         (source_target, dest_target) = q.get()
 
         if not args.no_op:
-            shutil.move(source_target, dest_target)
+            try:
+                shutil.move(source_target, dest_target)
+            except Exception, err:
+                logging.error("Failure while moving file -- %s" % err)
+                exit()
+
         logging.info("[%d]Moved: %s to %s" % (thread_id, source_target, dest_target))
         if args.debug_mode:
             print("[%d]Moved: %s to %s" % (thread_id, source_target, dest_target))
@@ -76,13 +82,15 @@ def main():
                     break
 
                 stats = os.stat(source_target)
-                mod_date = datetime.datetime.fromtimestamp(stats.st_atime)
+                mod_date = datetime.datetime.fromtimestamp(stats.st_mtime)
+                acc_date = datetime.datetime.fromtimestamp(stats.st_mtime)
 
                 if args.debug_mode:
                     print("Source: %s" % source_target)
-                    print("ATIME: %s" % mod_date.strftime("%c"))
+                    print("ATIME: %s" % acc_date.strftime("%c"))
+                    print("MTIME: %s" % mod_date.strftime("%c"))
 
-                if (NOW - mod_date) > AGE_INTERVAL:
+                if (NOW - acc_date) > AGE_INTERVAL:
                     dest_target_path = os.path.join(args.dest_root, os.path.relpath(root, args.source_root))
                     dest_target = os.path.join(dest_target_path, thefile)
 
@@ -92,12 +100,12 @@ def main():
                             os.makedirs(dest_target_path)
                         logging.info("Created dir: %s" % (dest_target_path))
                         if args.debug_mode:
-                            print("Mkdir: %s" % (dest_target_path))
+                            print("Created dir: %s" % (dest_target_path))
 
                     # add to queue
                     file_queue.put((source_target, dest_target))
 
-                # wait for file(s) to be moved and threads finished
+                # wait for threads to be done processing the queue items
                 while not file_queue.empty():
                     time.sleep(0.1)
 
@@ -131,6 +139,9 @@ def main():
     except KeyboardInterrupt:
         shouldIKeepGoing = False
         raise
+    except Exception, err:
+        logging.error("Failure -- %s" % err)
+        exit()
 
 # Start program
 if __name__ == "__main__":
