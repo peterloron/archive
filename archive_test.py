@@ -77,7 +77,7 @@ class TestArchive(unittest.TestCase):
 
     def testFirstPass(self):
         # run a pass of archive
-        subprocess.check_call(['/usr/bin/python', 'archive.py', '-a90', '-s./1Folder Space', '-d./testout/1Folder Space','--debug'])
+        subprocess.check_call(['/usr/bin/python', 'archive.py', '-a90', '-s./1Folder Space', '-d./testout/1Folder Space'])
 
         # check what we have in the source
         thepath = os.path.join(self.ROOT, "1Folder Space")
